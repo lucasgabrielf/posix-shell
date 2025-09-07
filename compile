@@ -1,0 +1,18 @@
+gcc shellvis.c -o shellvis
+chmod +x ./shellvis
+
+cd bin/
+
+gcc cat.c -o cat
+chmod +x ./cat
+
+gcc touch.c -o touch
+chmod +x ./touch
+
+gcc rm.c -o rm
+chmod +x ./rm
+
+gcc cp.c -o cp
+chmod +x ./cp
+
+cd ..
