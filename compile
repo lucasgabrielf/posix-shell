@@ -15,4 +15,7 @@ chmod +x ./rm
 gcc cp.c -o cp
 chmod +x ./cp
 
+gcc grep.c -o grep
+chmod +x ./grep
+
 cd ..

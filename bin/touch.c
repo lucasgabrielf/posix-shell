@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
-#include <fcntl.h> // for O_CREATE
+#include <fcntl.h> // for O_CREAT | O_RDWR | O_TRUNC
 #include <string.h>
 
 int main(int argc, char *argv[]) {
@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
 
     // 0644: File permissions (owner can read/write, group/others can read)
     // mode is REQUIRED when using O_CREAT
-    int fd = open(argv[1], O_CREAT | 0666);
+    int fd = open(argv[1], O_CREAT | O_RDWR | O_TRUNC, 0666);
 
     if (fd == -1) {
         perror("Error creating file:");

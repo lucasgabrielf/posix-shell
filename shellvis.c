@@ -16,6 +16,7 @@ const char *commands[] = {
     "touch",
     "rm",
     "cp",
+    "grep",
     NULL
 };
 
@@ -331,7 +332,7 @@ void shellvis() {
             strcat(FILE_DEST, cmd.args[1]);
 
             char *exec_args[4];
-            exec_args[0] = "rm";
+            exec_args[0] = "cp";
             exec_args[1] = FILE_ORIGIN;
             exec_args[2] = FILE_DEST;
             exec_args[3] = NULL;
@@ -343,7 +344,7 @@ void shellvis() {
             }
             else if(pid == 0){
                 execv(PATH, exec_args);
-                perror("'rm' faile:");
+                perror("'cp' faile:");
                 continue;
             }
             else {
@@ -351,6 +352,43 @@ void shellvis() {
             }
         }
 
+        else if (strcmp(cmd.method, "grep") == 0) {
+            if (cmd.argc!=3){
+                printf("Usage: %s [-n] <string> <file>\n", cmd.method);
+                continue;
+            }
+
+            char PATH[1024];
+            char FILE[1024];
+            
+            strcpy(PATH, BINARIES_DIR);
+            strcat(PATH, "/grep");
+            strcpy(FILE, DIR);
+            strcat(FILE, "/");
+            strcat(FILE, cmd.args[2]);
+            
+            char *exec_args[4];
+            exec_args[0] = "grep";
+            exec_args[1] = cmd.args[0];
+            exec_args[2] = cmd.args[1];
+            exec_args[3] = FILE;
+            exec_args[4] = NULL;
+
+            pid_t pid = fork();
+            if (pid < 0){
+                printf("Failed to create child process.\n");
+                continue;
+            }
+            else if(pid == 0){
+                execv(PATH, exec_args);
+                perror("'grep' faile:");
+                continue;
+            }
+            else {
+                wait(NULL);
+            }
+        }
+        
         else {
             printf("Command %s not recognized.\n", cmd.method);
         }
