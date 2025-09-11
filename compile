@@ -18,4 +18,7 @@ chmod +x ./cp
 gcc grep.c -o grep
 chmod +x ./grep
 
+gcc ls.c -o ls
+chmod +x ./ls
+
 cd ..
