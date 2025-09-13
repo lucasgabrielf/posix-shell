@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #define MAX_ARGS 16 // maximum number of arguments passed
 #define MAX_COMMANDS 8
@@ -10,12 +11,12 @@
 const char *commands[] = {
     "pwd",
     "cd",
-    "ls",
-    "echo",
+    "path",
     "exit",
     "cat",
     "touch",
     "rm",
+    "ls",
     "cp",
     "grep",
     NULL
@@ -57,7 +58,7 @@ int isspace(int c) {
 //     while (*ptr && isspace((unsigned char)*ptr)) {
 //         ptr++;
 //     }
-    
+
 //     if (*ptr == '\0' or *ptr == '&') {
 //         *ptr = '\0';
 //         return result;
@@ -96,7 +97,7 @@ int isspace(int c) {
 //             ptr++; // find the next argument
 //         }
 //     }
-    
+
 //     result.args[result.argc] = NULL;
 
 //     for (int i = 0; commands[i] != NULL; i++) {
@@ -106,7 +107,7 @@ int isspace(int c) {
 //             break;
 //         }
 //     }
-    
+
 //     // if command is not valid reset the command pointer to NULL for easy checking
 //     if (!result.is_valid) {
 //         result.method = NULL;
@@ -117,7 +118,7 @@ int isspace(int c) {
 
 int parse_commands(char *line, const char **valid_cmds, Command *results) {
     int command_count = 0;
-    
+
     // splits the line by the '&' delimiter
     char *command_str = strtok(line, "&");
 
@@ -140,11 +141,11 @@ int parse_commands(char *line, const char **valid_cmds, Command *results) {
 
 
         current_cmd->method = ptr;
-        
+
         while (*ptr && !isspace((unsigned char)*ptr)) {
             ptr++;
         }
-        
+
         if (*ptr) {
             *ptr = '\0';
             ptr++;
@@ -182,8 +183,14 @@ int parse_commands(char *line, const char **valid_cmds, Command *results) {
         }
         
         if (!current_cmd->is_valid) {
-            fprintf(stderr, "Error: command '%s' not found.\n", current_cmd->method);
-            current_cmd->method = NULL;
+            if (strstr(current_cmd->method, "./") != NULL) {
+                // method is a program
+                current_cmd->is_valid = 1;
+            }
+            else{
+                fprintf(stderr, "Error: command '%s' not found.\n", current_cmd->method);
+                current_cmd->method = NULL;
+            }
         }
 
         command_count++;
@@ -193,7 +200,232 @@ int parse_commands(char *line, const char **valid_cmds, Command *results) {
     return command_count;
 }
 
+// void execute_command(Command cmd, char *input_file, char *output_file) {
+//     pid_t pid = fork();
 
+//     if (pid == -1) {
+//         perror("fork");
+//         return;
+//     }
+
+//     if (pid == 0) {
+//         if (input_file != NULL) {
+//             int input_fd = open(input_file, O_RDONLY);
+//             if (input_fd == -1) {
+//                 perror("open (input)");
+//                 exit(EXIT_FAILURE);
+//             }
+//             if (dup2(input_fd, STDIN_FILENO) == -1) {
+//                 perror("dup2 (input)");
+//                 exit(EXIT_FAILURE);
+//             }
+//             close(input_fd);
+//         }
+
+//         if (output_file != NULL) {
+//             int flags = O_WRONLY | O_CREAT | O_TRUNC;
+//             mode_t mode = 0644;
+//             int output_fd = open(output_file, flags, mode);
+//             if (output_fd == -1) {
+//                 perror("open (output)");
+//                 exit(EXIT_FAILURE);
+//             }
+//             if (dup2(output_fd, STDOUT_FILENO) == -1) {
+//                 perror("dup2 (output)");
+//                 exit(EXIT_FAILURE);
+//             }
+//             close(output_fd);
+//         }
+
+//         char *exec_args[MAX_ARGS];
+//         exec_args[0] = cmd.method;
+//         int counter = 1;
+//         for (int i=0; i<cmd.argc; i++) {
+//             if (cmd.args[i] != NULL) {
+//                 exec_args[counter++] = cmd.args[i];
+//             }
+//         }
+//         exec_args[counter] = NULL;
+
+//         if (execvp(cmd.method, exec_args) == -1) {
+//             perror("execvp");
+//             exit(EXIT_FAILURE);
+//         }
+
+//     } else {
+//         wait(NULL);
+//     }
+// }
+
+
+void execute_command(char *executable_path, Command *cmd) {
+    char *inputFile = NULL;
+    char *outputFile = NULL;
+    char *clean_args[MAX_ARGS + 1]; // +1 to ensure space for the command name
+    int clean_argc = 0;
+
+    clean_args[clean_argc++] = cmd->method;
+
+    for (int i = 0; i < cmd->argc; i++) {
+        if (strcmp(cmd->args[i], "<") == 0) {
+            if (++i < cmd->argc) {
+                inputFile = cmd->args[i];
+            } else {
+                fprintf(stderr, "Syntax error: no file for input redirection.\n");
+                return;
+            }
+        } else if (strcmp(cmd->args[i], ">") == 0) {
+            if (++i < cmd->argc) {
+                outputFile = cmd->args[i];
+            } else {
+                fprintf(stderr, "Syntax error: no file for output redirection.\n");
+                return;
+            }
+        } else {
+            if (clean_argc < MAX_ARGS) {
+                clean_args[clean_argc++] = cmd->args[i];
+            } else {
+                fprintf(stderr, "Error: too many arguments.\n");
+                return;
+            }
+        }
+    }
+    clean_args[clean_argc] = NULL;
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork failed");
+        return;
+    }
+    else if (pid == 0) {
+        // input redirection
+        if (inputFile) {
+            int input_fd = open(inputFile, O_RDONLY);
+            if (input_fd == -1) {
+                perror("Failed to open input file");
+                exit(EXIT_FAILURE);
+            }
+            if (dup2(input_fd, STDIN_FILENO) == -1) {
+                perror("dup2 failed for stdin");
+                exit(EXIT_FAILURE);
+            }
+            close(input_fd);
+        }
+
+        // output redirection
+        if (outputFile) {
+            int output_fd = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            if (output_fd == -1) {
+                perror("Failed to open output file");
+                exit(EXIT_FAILURE);
+            }
+            if (dup2(output_fd, STDOUT_FILENO) == -1) {
+                perror("dup2 failed for stdout");
+                exit(EXIT_FAILURE);
+            }
+            close(output_fd);
+        }
+
+        execv(executable_path, clean_args);
+
+        perror("execv failed");
+        exit(EXIT_FAILURE);
+    }
+    else {
+        wait(NULL);
+    }
+}
+
+void execute_program(const Command *cmd) {
+    if (cmd == NULL || cmd->method == NULL) {
+        fprintf(stderr, "Error: Invalid command provided.\n");
+        return;
+    }
+
+    char *inputFile = NULL;
+    char *outputFile = NULL;
+    
+    char *clean_args[MAX_ARGS + 2];
+    int clean_argc = 0;
+
+    char program_name[1024];
+    strncpy(program_name, cmd->method+2, (int)strlen(cmd->method));
+    
+    clean_args[clean_argc++] = program_name;
+
+    for (int i = 0; i < cmd->argc; i++) {
+        // Input Redirection
+        if (strcmp(cmd->args[i], "<") == 0) {
+            if (++i < cmd->argc) {
+                inputFile = cmd->args[i];
+            } else {
+                fprintf(stderr, "Syntax error: No file specified for input redirection.\n");
+                return;
+            }
+        } 
+        else if (strcmp(cmd->args[i], ">") == 0) {
+            if (++i < cmd->argc) {
+                outputFile = cmd->args[i];
+            } else {
+                fprintf(stderr, "Syntax error: No file specified for output redirection.\n");
+                return;
+            }
+        } 
+        else {
+            if (clean_argc < (MAX_ARGS + 1)) {
+                clean_args[clean_argc++] = cmd->args[i];
+            } else {
+                fprintf(stderr, "Error: Too many arguments.\n");
+                return;
+            }
+        }
+    }
+    clean_args[clean_argc] = NULL;
+
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        perror("fork failed");
+        return;
+    } 
+    else if (pid == 0) {
+        if (inputFile) {
+            int input_fd = open(inputFile, O_RDONLY);
+            if (input_fd == -1) {
+                perror("Failed to open input file");
+                exit(EXIT_FAILURE);
+            }
+            if (dup2(input_fd, STDIN_FILENO) == -1) {
+                perror("dup2 failed for stdin");
+                exit(EXIT_FAILURE);
+            }
+            close(input_fd);
+        }
+
+        if (outputFile) {
+            int output_fd = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            if (output_fd == -1) {
+                perror("Failed to open output file");
+                exit(EXIT_FAILURE);
+            }
+            if (dup2(output_fd, STDOUT_FILENO) == -1) {
+                perror("dup2 failed for stdout");
+                exit(EXIT_FAILURE);
+            }
+            close(output_fd);
+        }
+        
+        execvp(clean_args[0], clean_args);
+
+        fprintf(stderr, "Error: command not found: %s\n", clean_args[0]);
+        exit(EXIT_FAILURE);
+    } 
+    else {
+        // --- PARENT PROCESS ---
+        // Wait for the child process to finish.
+        wait(NULL);
+    }
+}
 
 void background_task(Command cmd, char *DIR, char *BINARIES_DIR) {
     if (!cmd.is_valid) return;
@@ -207,7 +439,7 @@ void background_task(Command cmd, char *DIR, char *BINARIES_DIR) {
 
     // if(pid == 0) {
     if(strcmp(cmd.method, "cat") == 0) {
-        if (cmd.argc<1){
+        if (cmd.argc < 1){
             printf("Usage: %s <filename>\n", cmd.method);
             return;
         }
@@ -216,107 +448,116 @@ void background_task(Command cmd, char *DIR, char *BINARIES_DIR) {
         char FILE[1024];
 
         strcpy(PATH, BINARIES_DIR);
-        strcat(PATH, "/cat");
+        strcat(PATH, "/cat"); // exe path
         strcpy(FILE, DIR);
         strcat(FILE, "/");
         strcat(FILE, cmd.args[0]);
+        cmd.args[0] = FILE;
 
         if (access(FILE, F_OK)==-1) {
             printf("File %s does not exist.\n", cmd.args[0]);
             return;
         }
-        
-        char *exec_args[3];
-        exec_args[0] = "cat";
-        exec_args[1] = FILE;
-        exec_args[2] = NULL;
 
-        pid_t pid = fork();
-        if (pid < 0){
-            printf("Failed to create child process.\n");
-            exit(EXIT_FAILURE);
-        }
-        else if(pid == 0){
-            execv(PATH, exec_args);
-            perror("'cat' failed:");
-            exit(EXIT_FAILURE);
-        }
-        else {
-            wait(NULL);
-        }
+        execute_command(PATH, &cmd);
+
+        // char *exec_args[3];
+        // exec_args[0] = "cat";
+        // exec_args[1] = FILE;
+        // exec_args[2] = NULL;
+
+        // pid_t pid = fork();
+        // if (pid < 0){
+        //     printf("Failed to create child process.\n");
+        //     exit(EXIT_FAILURE);
+        // }
+        // else if(pid == 0){
+        //     execv(PATH, exec_args);
+        //     perror("'cat' failed:");
+        //     exit(EXIT_FAILURE);
+        // }
+        // else {
+        //     wait(NULL);
+        // }
+
     }
 
     else if (strcmp(cmd.method, "touch") == 0) {
-        if (cmd.argc<1){
+        if (cmd.argc < 1){
             printf("Usage: %s <filename>\n", cmd.method);
             return;
         }
 
         char PATH[1024];
         char FILE[1024];
-        
+
         strcpy(PATH, BINARIES_DIR);
         strcat(PATH, "/touch");
         strcpy(FILE, DIR);
         strcat(FILE, "/");
         strcat(FILE, cmd.args[0]);
+        cmd.args[0] = FILE;
 
-        char *exec_args[3];
-        exec_args[0] = "touch";
-        exec_args[1] = FILE;
-        exec_args[2] = NULL;
+        // char *exec_args[3];
+        // exec_args[0] = "touch";
+        // exec_args[1] = FILE;
+        // exec_args[2] = NULL;
 
-        pid_t pid = fork();
-        if (pid < 0){
-            printf("Failed to create child process.\n");
-        }
-        else if(pid == 0){
-            execv(PATH, exec_args);
-            perror("'touch' failed:");
+        // pid_t pid = fork();
+        // if (pid < 0){
+        //     printf("Failed to create child process.\n");
+        // }
+        // else if(pid == 0){
+        //     execv(PATH, exec_args);
+        //     perror("'touch' failed:");
 
-        }
-        else {
-            wait(NULL);
-        }
+        // }
+        // else {
+        //     wait(NULL);
+        // }
+        execute_command(PATH, &cmd);
+
     }
 
     else if (strcmp(cmd.method, "rm") == 0) {
-        if (cmd.argc<1){
+        if (cmd.argc < 1){
             printf("Usage: %s <filename>\n", cmd.method);
             return;
         }
 
         char PATH[1024];
         char FILE[1024];
-        
+
         strcpy(PATH, BINARIES_DIR);
         strcat(PATH, "/rm");
         strcpy(FILE, DIR);
         strcat(FILE, "/");
         strcat(FILE, cmd.args[0]);
+        cmd.args[0] = FILE;
 
-        char *exec_args[3];
-        exec_args[0] = "rm";
-        exec_args[1] = FILE;
-        exec_args[2] = NULL;
+        // char *exec_args[3];
+        // exec_args[0] = "rm";
+        // exec_args[1] = FILE;
+        // exec_args[2] = NULL;
 
-        pid_t pid = fork();
-        if (pid < 0){
-            printf("Failed to create child process.\n");
+        // pid_t pid = fork();
+        // if (pid < 0){
+        //     printf("Failed to create child process.\n");
 
-        }
-        else if(pid == 0){
-            execv(PATH, exec_args);
-            perror("'rm' faile:");
+        // }
+        // else if(pid == 0){
+        //     execv(PATH, exec_args);
+        //     perror("'rm' faile:");
 
-        }
-        else {
-            wait(NULL);
-        }
+        // }
+        // else {
+        //     wait(NULL);
+        // }
+        execute_command(PATH, &cmd);
     }
 
     else if (strcmp(cmd.method, "cp") == 0) {
-        if (cmd.argc!=2){
+        if (cmd.argc < 2){
             printf("Usage: %s <source_file> <destination_file>\n", cmd.method);
             return;
         }
@@ -324,128 +565,137 @@ void background_task(Command cmd, char *DIR, char *BINARIES_DIR) {
         char PATH[1024];
         char FILE_ORIGIN[1024];
         char FILE_DEST[1024];
-        
+
         strcpy(PATH, BINARIES_DIR);
         strcat(PATH, "/cp");
         strcpy(FILE_ORIGIN, DIR);
         strcat(FILE_ORIGIN, "/");
         strcat(FILE_ORIGIN, cmd.args[0]);
+        cmd.args[0] = FILE_ORIGIN;
+
         strcpy(FILE_DEST, DIR);
         strcat(FILE_DEST, "/");
         strcat(FILE_DEST, cmd.args[1]);
+        cmd.args[1] = FILE_DEST;
+
 
         if (access(FILE_ORIGIN, F_OK)==-1) {
             printf("File %s does not exist.\n", cmd.args[0]);
             return;
         }
 
-        char *exec_args[4];
-        exec_args[0] = "cp";
-        exec_args[1] = FILE_ORIGIN;
-        exec_args[2] = FILE_DEST;
-        exec_args[3] = NULL;
+        // char *exec_args[4];
+        // exec_args[0] = "cp";
+        // exec_args[1] = FILE_ORIGIN;
+        // exec_args[2] = FILE_DEST;
+        // exec_args[3] = NULL;
 
-        pid_t pid = fork();
-        if (pid < 0){
-            printf("Failed to create child process.\n");
+        // pid_t pid = fork();
+        // if (pid < 0){
+        //     printf("Failed to create child process.\n");
 
-        }
-        else if(pid == 0){
-            execv(PATH, exec_args);
-            perror("'cp' faile:");
+        // }
+        // else if(pid == 0){
+        //     execv(PATH, exec_args);
+        //     perror("'cp' faile:");
 
-        }
-        else {
-            wait(NULL);
-        }
+        // }
+        // else {
+        //     wait(NULL);
+        // }
+        execute_command(PATH, &cmd);
     }
 
     else if (strcmp(cmd.method, "grep") == 0) {
-        if (cmd.argc!=3){
+        if (cmd.argc < 3){
             printf("Usage: %s [-n] <string> <file>\n", cmd.method);
             return;
         }
 
         char PATH[1024];
         char FILE[1024];
-        
+
         strcpy(PATH, BINARIES_DIR);
         strcat(PATH, "/grep");
         strcpy(FILE, DIR);
         strcat(FILE, "/");
         strcat(FILE, cmd.args[2]);
+        cmd.args[2] = FILE;
 
         if (access(FILE, F_OK)==-1) {
-            printf("File %s does not exist.\n", cmd.args[2]);                                        
+            printf("File %s does not exist.\n", cmd.args[2]);
             return;
         }
-        
-        char *exec_args[5];
-        exec_args[0] = "grep";
-        exec_args[1] = cmd.args[0];
-        exec_args[2] = cmd.args[1];
-        exec_args[3] = FILE;
-        exec_args[4] = NULL;
 
-        pid_t pid = fork();
-        if (pid < 0){
-            printf("Failed to create child process.\n");
+        // char *exec_args[5];
+        // exec_args[0] = "grep";
+        // exec_args[1] = cmd.args[0];
+        // exec_args[2] = cmd.args[1];
+        // exec_args[3] = FILE;
+        // exec_args[4] = NULL;
 
-        }
-        else if(pid == 0){
-            execv(PATH, exec_args);
-            perror("'grep' faile:");
+        // pid_t pid = fork();
+        // if (pid < 0){
+        //     printf("Failed to create child process.\n");
 
-        }
-        else {
-            wait(NULL);
-        }
+        // }
+        // else if(pid == 0){
+        //     execv(PATH, exec_args);
+        //     perror("'grep' faile:");
+
+        // }
+        // else {
+        //     wait(NULL);
+        // }
+        execute_command(PATH, &cmd);
     }
 
     else if (strcmp(cmd.method, "ls") == 0) {
-        if (cmd.argc>2) {
-            printf("Usage: %s [-l] [-a]\n", cmd.method);
-            return;
-        }
-
         char PATH[1024];
         char DIR_PATH[1024];
-        
+
         strcpy(PATH, BINARIES_DIR);
         strcat(PATH, "/ls");
         strcpy(DIR_PATH, DIR);
-        
+
         int idx = 0;
 
         char *exec_args[6];
         exec_args[idx++] = "ls";
 
-        for (int i=0; i<cmd.argc; i++) {
-            exec_args[idx++] = cmd.args[i];
-        }
-        exec_args[idx++] = DIR_PATH;
-        exec_args[idx] = NULL;
+        // for (int i=0; i<cmd.argc; i++) {
+        //     exec_args[idx++] = cmd.args[i];
+        // }
+        cmd.args[cmd.argc++] = DIR_PATH;
+        cmd.args[cmd.argc] = NULL;
+
+        // exec_args[idx++] = DIR_PATH;
+        // exec_args[idx] = NULL;
 
 
-        pid_t pid = fork();
-        if (pid < 0){
-            printf("Failed to create child process.\n");
+        // pid_t pid = fork();
+        // if (pid < 0){
+        //     printf("Failed to create child process.\n");
 
-        }
-        else if(pid == 0){
-            execv(PATH, exec_args);
-            perror("'grep' faile:");
+        // }
+        // else if(pid == 0){
+        //     execv(PATH, exec_args);
+        //     perror("'ls' failed:");
 
-        }
-        else {
-            wait(NULL);
-        }
-    }            
+        // }
+        // else {
+        //     wait(NULL);
+        // }
+        execute_command(PATH, &cmd);
+    }
+
+    else if (strstr(cmd.method, "./") != NULL) {
+        execute_program(&cmd);
+    }
 
     else {
         printf("Command %s not recognized.\n", cmd.method);
     }
-    return;
 }
 
 /*
@@ -458,7 +708,7 @@ void mostrar_prompt(char *dir) {
     else {
         printf("shellvis:%s> ", dir);
     }
-    fflush(stdout);  
+    fflush(stdout);
 }
 
 
@@ -471,26 +721,26 @@ int pwd_method(char *dir){
     return 0;
 }
 
-/* 
+/*
  * Função principal do shell
  * Os alunos devem implementar aqui o loop principal
  * A leitura de comandos, execução e outras funcionalidades podem ser implementadas em outras funções auxiliares e chamadas aqui
 */
 void shellvis() {
     char linha[1024];
-    
+
     char DIR[1024];
     char BINARIES_DIR[1024];
-    
+
     pwd_method(DIR); // initialize DIR
     strcpy(BINARIES_DIR, DIR);
     strcat(BINARIES_DIR, "/bin");
-    
-    while (1) { 
+
+    while (1) {
         mostrar_prompt(DIR);
         if (fgets(linha, sizeof(linha), stdin) == NULL) {
             printf("\n");
-            break; 
+            break;
         }
         linha[strcspn(linha, "\n")] = 0;
 
@@ -511,16 +761,16 @@ void shellvis() {
                 continue;
             }
 
-            printf("------------------------\n");
-            printf("Parsing Result:\n");
-            printf("  Command: '%s'\n", cmd.method);
-            printf("  Arguments: %d\n", cmd.argc);
-            for (int i=0; i<cmd.argc; i++) {
-                printf("  Argument %d: %s\n", i, cmd.args[i]);
-            }
-            printf("  Is Valid: %s\n", cmd.is_valid ? "Yes" : "No");
-            printf("------------------------\n");
-            
+            // printf("------------------------\n");
+            // printf("Parsing Result:\n");
+            // printf("  Command: '%s'\n", cmd.method);
+            // printf("  Arguments: %d\n", cmd.argc);
+            // for (int i=0; i<cmd.argc; i++) {
+            //     printf("  Argument %d: %s\n", i, cmd.args[i]);
+            // }
+            // printf("  Is Valid: %s\n", cmd.is_valid ? "Yes" : "No");
+            // printf("------------------------\n");
+
             if (strcmp(cmd.method, "exit") == 0) {
                 while (wait(NULL) > 0);
                 goto exit_shellvis;
@@ -543,6 +793,45 @@ void shellvis() {
                 }
                 pwd_method(DIR);
             }
+
+            else if (strcmp(cmd.method, "path") == 0) {
+                if (cmd.argc == 0) {
+                    char *current_path = getenv("PATH");
+                    if (current_path) {
+                        printf("%s\n", current_path);
+                    }
+                } else {
+                    size_t total_len = 0;
+                    for (int i = 0; i < cmd.argc; i++) {
+                        total_len += strlen(cmd.args[i]);
+                    }
+                    total_len += cmd.argc; 
+
+                    char *new_path = malloc(total_len);
+                    if (new_path == NULL) {
+                        perror("malloc");
+                        continue;
+                    }
+
+                    char *p = new_path;
+                    for (int i = 0; i < cmd.argc; i++) {
+                        size_t arg_len = strlen(cmd.args[i]);
+                        memcpy(p, cmd.args[i], arg_len);
+                        p += arg_len;
+                        if (i < cmd.argc - 1) {
+                            *p = ':';
+                            p++;
+                        }
+                    }
+                    *p = '\0';
+
+                    if (setenv("PATH", new_path, 1) == -1) {
+                        perror("setenv");
+                        free(new_path); 
+                    }
+                }
+            }
+
             else {
                 background_task(cmd, DIR, BINARIES_DIR);
             }
@@ -559,6 +848,6 @@ exit_shellvis:
 
 int main() {
     // chamada obrigatória
-    shellvis();    
+    shellvis();
     return 0;
 }
