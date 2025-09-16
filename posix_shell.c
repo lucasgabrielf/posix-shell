@@ -1,3 +1,28 @@
+/**
+ *                              ████                                                 █████                         
+ *                             ▒▒███                                                ▒▒███                          
+ *     █████ ███ █████  ██████  ▒███   ██████   ██████  █████████████    ██████     ███████    ██████              
+ *    ▒▒███ ▒███▒▒███  ███▒▒███ ▒███  ███▒▒███ ███▒▒███▒▒███▒▒███▒▒███  ███▒▒███   ▒▒▒███▒    ███▒▒███             
+ *     ▒███ ▒███ ▒███ ▒███████  ▒███ ▒███ ▒▒▒ ▒███ ▒███ ▒███ ▒███ ▒███ ▒███████      ▒███    ▒███ ▒███             
+ *     ▒▒███████████  ▒███▒▒▒   ▒███ ▒███  ███▒███ ▒███ ▒███ ▒███ ▒███ ▒███▒▒▒       ▒███ ███▒███ ▒███             
+ *      ▒▒████▒████   ▒▒██████  █████▒▒██████ ▒▒██████  █████▒███ █████▒▒██████      ▒▒█████ ▒▒██████              
+ *       ▒▒▒▒ ▒▒▒▒     ▒▒▒▒▒▒  ▒▒▒▒▒  ▒▒▒▒▒▒   ▒▒▒▒▒▒  ▒▒▒▒▒ ▒▒▒ ▒▒▒▒▒  ▒▒▒▒▒▒        ▒▒▒▒▒   ▒▒▒▒▒▒               
+ *                                                                                                                 
+ *                                                                                                                 
+ *                                                                                                                 
+ *     ███████████                    ███                                █████████  █████               ████  ████ 
+ *    ▒▒███▒▒▒▒▒███                  ▒▒▒                                ███▒▒▒▒▒███▒▒███               ▒▒███ ▒▒███ 
+ *     ▒███    ▒███  ██████   █████  ████  █████ █████                 ▒███    ▒▒▒  ▒███████    ██████  ▒███  ▒███ 
+ *     ▒██████████  ███▒▒███ ███▒▒  ▒▒███ ▒▒███ ▒▒███     ██████████   ▒▒█████████  ▒███▒▒███  ███▒▒███ ▒███  ▒███ 
+ *     ▒███▒▒▒▒▒▒  ▒███ ▒███▒▒█████  ▒███  ▒▒▒█████▒     ▒▒▒▒▒▒▒▒▒▒     ▒▒▒▒▒▒▒▒███ ▒███ ▒███ ▒███████  ▒███  ▒███ 
+ *     ▒███        ▒███ ▒███ ▒▒▒▒███ ▒███   ███▒▒▒███                   ███    ▒███ ▒███ ▒███ ▒███▒▒▒   ▒███  ▒███ 
+ *     █████       ▒▒██████  ██████  █████ █████ █████                 ▒▒█████████  ████ █████▒▒██████  █████ █████
+ *    ▒▒▒▒▒         ▒▒▒▒▒▒  ▒▒▒▒▒▒  ▒▒▒▒▒ ▒▒▒▒▒ ▒▒▒▒▒                   ▒▒▒▒▒▒▒▒▒  ▒▒▒▒ ▒▒▒▒▒  ▒▒▒▒▒▒  ▒▒▒▒▒ ▒▒▒▒▒ 
+ *                                                                                                                 
+ *                                                                                                                 
+ *                                                                                                                 
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +59,35 @@ typedef struct {
     int is_valid;
 } Command;
 
+//* list of methods created for the execution of the program
+// parse the terminal line the user wrote; also, separates the commands between '&'
+int parse_commands(char *line, const char **valid_cmds, Command *results);
+
+// execute a command in a child process
+void execute_command(char *executable_path, Command *cmd);
+
+// searches in path and executes a program binary in a child process
+void execute_program(const Command *cmd);
+
+// method that orchestrates the execution of the cmd commands with execute_command
+// and execute_program
+void background_task(Command cmd, char *DIR, char *BINARIES_DIR);
+
+// util methods
+int cd_method(char *new_dir);
+int pwd_method(char *dir);
+int isspace(int c);
+
+void mostrar_prompt(char *dir);
+void posix_shell();
+void wellcome(char *DIR, char *BINARIES_DIR);
+
+int main() {
+    // chamada obrigatória
+    posix_shell();
+    return 0;
+}
+
 int isspace(int c) {
     switch (c) {
         case ' ':
@@ -47,74 +101,6 @@ int isspace(int c) {
             return 0; // is not
     }
 }
-
-// ! Deprecated method, as it does not account for parallel execution of multiple commands
-// Command parse_command(char *line, const char **commands){
-//     // parser created to populate the scruct with the correct method and arguments list
-//     Command result = {NULL, NULL, 0};
-//     result.argc = 0;
-//     char *ptr = line;
-
-//     while (*ptr && isspace((unsigned char)*ptr)) {
-//         ptr++;
-//     }
-
-//     if (*ptr == '\0' or *ptr == '&') {
-//         *ptr = '\0';
-//         return result;
-//     }
-
-//     result.method = ptr;
-
-//     while (*ptr && !isspace((unsigned char)*ptr)) {
-//         ptr++;
-//     }
-
-//     *ptr = '\0';
-//     ptr++;
-
-//     while (*ptr != '\0' && result.argc < MAX_ARGS - 1) {
-//         // skp white spaces and if null terminaded, finish
-//         while (*ptr && isspace((unsigned char)*ptr)) {
-//             ptr++;
-//         }
-
-//         if (*ptr == '\0') {
-//             break;
-//         }
-
-//         // saves the pointer to the start of new arg
-//         result.args[result.argc] = ptr;
-//         result.argc++;
-
-//         while (*ptr && !isspace((unsigned char)*ptr)) {
-//             ptr++;
-//         }
-
-//         // add \0 to indicate end of the current arg, if string not finished yet
-//         if (*ptr != '\0') {
-//             *ptr = '\0';
-//             ptr++; // find the next argument
-//         }
-//     }
-
-//     result.args[result.argc] = NULL;
-
-//     for (int i = 0; commands[i] != NULL; i++) {
-//         if (strcmp(result.method, commands[i]) == 0) {
-//             result.is_valid = 1;
-//             printf("%s\n", commands[i]);
-//             break;
-//         }
-//     }
-
-//     // if command is not valid reset the command pointer to NULL for easy checking
-//     if (!result.is_valid) {
-//         result.method = NULL;
-//     }
-
-//     return result;
-// }
 
 int parse_commands(char *line, const char **valid_cmds, Command *results) {
     int command_count = 0;
@@ -200,64 +186,6 @@ int parse_commands(char *line, const char **valid_cmds, Command *results) {
     return command_count;
 }
 
-// void execute_command(Command cmd, char *input_file, char *output_file) {
-//     pid_t pid = fork();
-
-//     if (pid == -1) {
-//         perror("fork");
-//         return;
-//     }
-
-//     if (pid == 0) {
-//         if (input_file != NULL) {
-//             int input_fd = open(input_file, O_RDONLY);
-//             if (input_fd == -1) {
-//                 perror("open (input)");
-//                 exit(EXIT_FAILURE);
-//             }
-//             if (dup2(input_fd, STDIN_FILENO) == -1) {
-//                 perror("dup2 (input)");
-//                 exit(EXIT_FAILURE);
-//             }
-//             close(input_fd);
-//         }
-
-//         if (output_file != NULL) {
-//             int flags = O_WRONLY | O_CREAT | O_TRUNC;
-//             mode_t mode = 0644;
-//             int output_fd = open(output_file, flags, mode);
-//             if (output_fd == -1) {
-//                 perror("open (output)");
-//                 exit(EXIT_FAILURE);
-//             }
-//             if (dup2(output_fd, STDOUT_FILENO) == -1) {
-//                 perror("dup2 (output)");
-//                 exit(EXIT_FAILURE);
-//             }
-//             close(output_fd);
-//         }
-
-//         char *exec_args[MAX_ARGS];
-//         exec_args[0] = cmd.method;
-//         int counter = 1;
-//         for (int i=0; i<cmd.argc; i++) {
-//             if (cmd.args[i] != NULL) {
-//                 exec_args[counter++] = cmd.args[i];
-//             }
-//         }
-//         exec_args[counter] = NULL;
-
-//         if (execvp(cmd.method, exec_args) == -1) {
-//             perror("execvp");
-//             exit(EXIT_FAILURE);
-//         }
-
-//     } else {
-//         wait(NULL);
-//     }
-// }
-
-
 void execute_command(char *executable_path, Command *cmd) {
     char *inputFile = NULL;
     char *outputFile = NULL;
@@ -332,7 +260,8 @@ void execute_command(char *executable_path, Command *cmd) {
         exit(EXIT_FAILURE);
     }
     else {
-        wait(NULL);
+        // this line makes the execution of commands between & sequential instead of parallel
+        // wait(NULL);
     }
 }
 
@@ -421,23 +350,14 @@ void execute_program(const Command *cmd) {
         exit(EXIT_FAILURE);
     } 
     else {
-        // --- PARENT PROCESS ---
-        // Wait for the child process to finish.
-        wait(NULL);
+        // this line makes the execution of commands between & sequential instead of parallel
+        // wait(NULL);
     }
 }
 
 void background_task(Command cmd, char *DIR, char *BINARIES_DIR) {
     if (!cmd.is_valid) return;
 
-    // id_t pid = fork();
-
-    // if (pid<0) {
-    //     perror("Running method in background failed");
-    //     return;
-    // }
-
-    // if(pid == 0) {
     if(strcmp(cmd.method, "cat") == 0) {
         if (cmd.argc < 1){
             printf("Usage: %s <filename>\n", cmd.method);
@@ -460,26 +380,6 @@ void background_task(Command cmd, char *DIR, char *BINARIES_DIR) {
         }
 
         execute_command(PATH, &cmd);
-
-        // char *exec_args[3];
-        // exec_args[0] = "cat";
-        // exec_args[1] = FILE;
-        // exec_args[2] = NULL;
-
-        // pid_t pid = fork();
-        // if (pid < 0){
-        //     printf("Failed to create child process.\n");
-        //     exit(EXIT_FAILURE);
-        // }
-        // else if(pid == 0){
-        //     execv(PATH, exec_args);
-        //     perror("'cat' failed:");
-        //     exit(EXIT_FAILURE);
-        // }
-        // else {
-        //     wait(NULL);
-        // }
-
     }
 
     else if (strcmp(cmd.method, "touch") == 0) {
@@ -498,23 +398,6 @@ void background_task(Command cmd, char *DIR, char *BINARIES_DIR) {
         strcat(FILE, cmd.args[0]);
         cmd.args[0] = FILE;
 
-        // char *exec_args[3];
-        // exec_args[0] = "touch";
-        // exec_args[1] = FILE;
-        // exec_args[2] = NULL;
-
-        // pid_t pid = fork();
-        // if (pid < 0){
-        //     printf("Failed to create child process.\n");
-        // }
-        // else if(pid == 0){
-        //     execv(PATH, exec_args);
-        //     perror("'touch' failed:");
-
-        // }
-        // else {
-        //     wait(NULL);
-        // }
         execute_command(PATH, &cmd);
 
     }
@@ -534,25 +417,6 @@ void background_task(Command cmd, char *DIR, char *BINARIES_DIR) {
         strcat(FILE, "/");
         strcat(FILE, cmd.args[0]);
         cmd.args[0] = FILE;
-
-        // char *exec_args[3];
-        // exec_args[0] = "rm";
-        // exec_args[1] = FILE;
-        // exec_args[2] = NULL;
-
-        // pid_t pid = fork();
-        // if (pid < 0){
-        //     printf("Failed to create child process.\n");
-
-        // }
-        // else if(pid == 0){
-        //     execv(PATH, exec_args);
-        //     perror("'rm' faile:");
-
-        // }
-        // else {
-        //     wait(NULL);
-        // }
         execute_command(PATH, &cmd);
     }
 
@@ -583,26 +447,6 @@ void background_task(Command cmd, char *DIR, char *BINARIES_DIR) {
             printf("File %s does not exist.\n", cmd.args[0]);
             return;
         }
-
-        // char *exec_args[4];
-        // exec_args[0] = "cp";
-        // exec_args[1] = FILE_ORIGIN;
-        // exec_args[2] = FILE_DEST;
-        // exec_args[3] = NULL;
-
-        // pid_t pid = fork();
-        // if (pid < 0){
-        //     printf("Failed to create child process.\n");
-
-        // }
-        // else if(pid == 0){
-        //     execv(PATH, exec_args);
-        //     perror("'cp' faile:");
-
-        // }
-        // else {
-        //     wait(NULL);
-        // }
         execute_command(PATH, &cmd);
     }
 
@@ -626,27 +470,6 @@ void background_task(Command cmd, char *DIR, char *BINARIES_DIR) {
             printf("File %s does not exist.\n", cmd.args[2]);
             return;
         }
-
-        // char *exec_args[5];
-        // exec_args[0] = "grep";
-        // exec_args[1] = cmd.args[0];
-        // exec_args[2] = cmd.args[1];
-        // exec_args[3] = FILE;
-        // exec_args[4] = NULL;
-
-        // pid_t pid = fork();
-        // if (pid < 0){
-        //     printf("Failed to create child process.\n");
-
-        // }
-        // else if(pid == 0){
-        //     execv(PATH, exec_args);
-        //     perror("'grep' faile:");
-
-        // }
-        // else {
-        //     wait(NULL);
-        // }
         execute_command(PATH, &cmd);
     }
 
@@ -663,29 +486,9 @@ void background_task(Command cmd, char *DIR, char *BINARIES_DIR) {
         char *exec_args[6];
         exec_args[idx++] = "ls";
 
-        // for (int i=0; i<cmd.argc; i++) {
-        //     exec_args[idx++] = cmd.args[i];
-        // }
         cmd.args[cmd.argc++] = DIR_PATH;
         cmd.args[cmd.argc] = NULL;
 
-        // exec_args[idx++] = DIR_PATH;
-        // exec_args[idx] = NULL;
-
-
-        // pid_t pid = fork();
-        // if (pid < 0){
-        //     printf("Failed to create child process.\n");
-
-        // }
-        // else if(pid == 0){
-        //     execv(PATH, exec_args);
-        //     perror("'ls' failed:");
-
-        // }
-        // else {
-        //     wait(NULL);
-        // }
         execute_command(PATH, &cmd);
     }
 
@@ -703,11 +506,12 @@ void background_task(Command cmd, char *DIR, char *BINARIES_DIR) {
 */
 void mostrar_prompt(char *dir) {
     if (dir==NULL){
-        printf("shellvis/> ");
+        printf("Posix-Shell/> ");
     }
     else {
-        printf("shellvis:%s> ", dir);
+        printf("Posix-Shell:%s> ", dir);
     }
+    // printf("Posix-Shell> ");
     fflush(stdout);
 }
 
@@ -721,12 +525,23 @@ int pwd_method(char *dir){
     return 0;
 }
 
+void wellcome(char *DIR, char *BINARIES_DIR){
+    char linha[] = "cat greetings.txt";
+    linha[strcspn(linha, "\n")] = 0;
+    Command cmds[MAX_COMMANDS];
+    parse_commands(linha, commands, cmds);
+    Command cmd = cmds[0];
+    background_task(cmd, DIR, BINARIES_DIR);
+    while(wait(NULL)>1);
+    return;
+}
+
 /*
  * Função principal do shell
  * Os alunos devem implementar aqui o loop principal
  * A leitura de comandos, execução e outras funcionalidades podem ser implementadas em outras funções auxiliares e chamadas aqui
 */
-void shellvis() {
+void posix_shell() {
     char linha[1024];
 
     char DIR[1024];
@@ -735,6 +550,8 @@ void shellvis() {
     pwd_method(DIR); // initialize DIR
     strcpy(BINARIES_DIR, DIR);
     strcat(BINARIES_DIR, "/bin");
+
+    wellcome(DIR, BINARIES_DIR);
 
     while (1) {
         mostrar_prompt(DIR);
@@ -762,18 +579,18 @@ void shellvis() {
             }
 
             // printf("------------------------\n");
-            // printf("Parsing Result:\n");
-            // printf("  Command: '%s'\n", cmd.method);
-            // printf("  Arguments: %d\n", cmd.argc);
+            // printf("parsing Result:\n");
+            // printf("  command: '%s'\n", cmd.method);
+            // printf("  arguments: %d\n", cmd.argc);
             // for (int i=0; i<cmd.argc; i++) {
-            //     printf("  Argument %d: %s\n", i, cmd.args[i]);
+            //     printf("  argument %d: %s\n", i, cmd.args[i]);
             // }
-            // printf("  Is Valid: %s\n", cmd.is_valid ? "Yes" : "No");
+            // printf("  is Valid: %s\n", cmd.is_valid ? "Yes" : "No");
             // printf("------------------------\n");
 
             if (strcmp(cmd.method, "exit") == 0) {
                 while (wait(NULL) > 0);
-                goto exit_shellvis;
+                goto exit_posix_shell;
                 break;
             }
             else if (strcmp(cmd.method, "pwd") == 0){
@@ -841,13 +658,7 @@ void shellvis() {
         while (wait(NULL) > 0);
     }
 
-exit_shellvis:
+exit_posix_shell:
     // exits from all loops when exit is called
     return;
-}
-
-int main() {
-    // chamada obrigatória
-    shellvis();
-    return 0;
 }

@@ -11,6 +11,9 @@
 void print_long_format(const char *path, const char *name);
 
 int main(int argc, char *argv[]) {
+    /*
+    implementation of the ls method, accepting both -l and -a flags (as weel as its combinations)
+    */
     const char *dir_path = "."; 
     int long_format = 0;        // flag to check if -l is true
     int show_hidden = 0;        // flag to check if -a is true
@@ -73,33 +76,33 @@ void print_long_format(const char *path, const char *name) {
     snprintf(full_path, sizeof(full_path), "%s/%s", path, name);
 
     struct stat file_stat;
-    // Use lstat to get info about the file itself, not what it points to (if it's a symlink)
+    // use lstat to get info about the file itself, not what it points to (if it's a symlink)
     if (lstat(full_path, &file_stat) == -1) {
         perror("lstat failed");
         return;
     }
 
-    // 1. Print Permissions
-    // File type
+    // permissions
+    // file type
     printf((S_ISDIR(file_stat.st_mode)) ? "d" : "-");
     printf((S_ISLNK(file_stat.st_mode)) ? "l" : "-");
-    // User permissions
+    // user permissions
     printf((file_stat.st_mode & S_IRUSR) ? "r" : "-");
     printf((file_stat.st_mode & S_IWUSR) ? "w" : "-");
     printf((file_stat.st_mode & S_IXUSR) ? "x" : "-");
-    // Group permissions
+    // group permissions
     printf((file_stat.st_mode & S_IRGRP) ? "r" : "-");
     printf((file_stat.st_mode & S_IWGRP) ? "w" : "-");
     printf((file_stat.st_mode & S_IXGRP) ? "x" : "-");
-    // Other permissions
+    // other permissions
     printf((file_stat.st_mode & S_IROTH) ? "r" : "-");
     printf((file_stat.st_mode & S_IWOTH) ? "w" : "-");
     printf((file_stat.st_mode & S_IXOTH) ? "x" : "-");
 
-    // 2. Print Number of Hard Links
+    // number of hard links
     printf(" %2lu", file_stat.st_nlink);
 
-    // 3. Print Owner Name
+    // owner name
     struct passwd *pw = getpwuid(file_stat.st_uid);
     if (pw != NULL) {
         printf(" %-8s", pw->pw_name);
@@ -107,7 +110,7 @@ void print_long_format(const char *path, const char *name) {
         printf(" %-8d", file_stat.st_uid);
     }
 
-    // 4. Print Group Name
+    // group name
     struct group *gr = getgrgid(file_stat.st_gid);
     if (gr != NULL) {
         printf(" %-8s", gr->gr_name);
@@ -115,17 +118,16 @@ void print_long_format(const char *path, const char *name) {
         printf(" %-8d", file_stat.st_gid);
     }
 
-    // 5. Print File Size
+    // file size
     printf(" %8lld", (long long)file_stat.st_size);
 
-    // 6. Print Modification Time
+    // modification time
     char time_buf[80];
     struct tm *timeinfo = localtime(&file_stat.st_mtime);
-    // Format: "Sep 08 15:46"
+    // debian format: "Sep 08 15:46"
     strftime(time_buf, sizeof(time_buf), "%b %d %H:%M", timeinfo);
     printf(" %s", time_buf);
-
-    // 7. Print File Name
+    
     printf(" %s\n", name);
 }
 

@@ -1,5 +1,5 @@
-gcc shellvis.c -o shellvis
-chmod +x ./shellvis
+gcc posix_shell.c -o posix_shell
+chmod +x ./posix_shell
 
 cd bin/
 
